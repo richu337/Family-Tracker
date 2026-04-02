@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - name: string (required)
+    //   - phone: string (required)
+    //   - role: string (required, ['parent', 'child', 'guardian'])
+    //   - familyId: string (optional)
+    //   - profileImage: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: families
+    // Document ID: {familyId}
+    // Fields:
+    //   - familyName: string (required)
+    //   - createdBy: string (required, UID)
+    //   - createdAt: timestamp (required)
+    //   - inviteCode: string (required)
+    //
+    // Collection: families/{familyId}/members
+    // Document ID: {userId}
+    // Fields:
+    //   - nickname: string (required)
+    //   - role: string (required, ['admin', 'member'])
+    //   - joinedAt: timestamp (required)
+    //
+    // Collection: locations
+    // Document ID: {userId}
+    // Fields:
+    //   - latitude: number (required)
+    //   - longitude: number (required)
+    //   - accuracy: number (optional)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: status
+    // Document ID: {userId}
+    // Fields:
+    //   - currentStatus: string (required, ['Safe', 'Reached Home', 'On the Way', 'Need Help'])
+    //   - updatedAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "rayhanjaleel904@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
+             data.role in ['parent', 'child', 'guardian'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidFamily(data) {
+      return data.familyName is string && data.familyName.size() > 0 && data.familyName.size() < 50 &&
+             data.createdBy == request.auth.uid &&
+             data.createdAt is timestamp &&
+             data.inviteCode is string && data.inviteCode.size() == 6;
+    }
+
+    function isValidMember(data) {
+      return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() < 50 &&
+             data.role in ['admin', 'member'] &&
+             data.joinedAt is timestamp;
+    }
+
+    function isValidLocation(data) {
+      return data.latitude is number && data.latitude >= -90 && data.latitude <= 90 &&
+             data.longitude is number && data.longitude >= -180 && data.longitude <= 180 &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidStatus(data) {
+      return data.currentStatus in ['Safe', 'Reached Home', 'On the Way', 'Need Help'] &&
+             data.updatedAt is timestamp;
+    }
+
+    function isFamilyMember(familyId) {
+      return isAuthenticated() && exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /families/{familyId} {
+      allow read: if isFamilyMember(familyId) || isAdmin();
+      allow create: if isAuthenticated() && isValidFamily(request.resource.data);
+      allow update: if (isFamilyMember(familyId) && get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'admin') || isAdmin();
+      
+      match /members/{memberId} {
+        allow read: if isFamilyMember(familyId) || isAdmin();
+        allow create: if isAuthenticated() && isValidMember(request.resource.data);
+        allow update: if (isOwner(memberId) || (isFamilyMember(familyId) && get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'admin')) || isAdmin();
+        allow delete: if (isOwner(memberId) || (isFamilyMember(familyId) && get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'admin')) || isAdmin();
+      }
+    }
+
+    match /locations/{userId} {
+      allow read: if isAuthenticated(); // In a real app, we'd check if they are in the same family
+      allow write: if isOwner(userId) && isValidLocation(request.resource.data);
+    }
+
+    match /status/{userId} {
+      allow read: if isAuthenticated(); // In a real app, we'd check if they are in the same family
+      allow write: if isOwner(userId) && isValidStatus(request.resource.data);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

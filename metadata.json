@@ -1,0 +1,5 @@
+{
+  "name": "Family Safety Tracker",
+  "description": "A real-time family location sharing and safety monitoring application with SOS alerts and group management.",
+  "requestFramePermissions": ["geolocation", "notifications"]
+}

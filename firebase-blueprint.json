@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Stores account information for family members.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the user." },
+        "phone": { "type": "string", "description": "Phone number for identification." },
+        "role": { "type": "string", "enum": ["parent", "child", "guardian"], "description": "Role within the family." },
+        "familyId": { "type": "string", "description": "ID of the family group the user belongs to." },
+        "profileImage": { "type": "string", "description": "URL to the user's profile image." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the account was created." }
+      },
+      "required": ["name", "phone", "role", "createdAt"]
+    },
+    "Family": {
+      "title": "Family",
+      "description": "Represents a private family group.",
+      "type": "object",
+      "properties": {
+        "familyName": { "type": "string", "description": "Name of the family group." },
+        "createdBy": { "type": "string", "description": "UID of the user who created the group." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the group was created." },
+        "inviteCode": { "type": "string", "description": "Unique code to join this family." }
+      },
+      "required": ["familyName", "createdBy", "createdAt", "inviteCode"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "A user's membership details within a family.",
+      "type": "object",
+      "properties": {
+        "nickname": { "type": "string", "description": "Nickname used within the family." },
+        "role": { "type": "string", "enum": ["admin", "member"], "description": "Role within the family group." },
+        "joinedAt": { "type": "string", "format": "date-time", "description": "When the user joined the family." }
+      },
+      "required": ["nickname", "role", "joinedAt"]
+    },
+    "Location": {
+      "title": "Location",
+      "description": "Real-time GPS coordinates of a user.",
+      "type": "object",
+      "properties": {
+        "latitude": { "type": "number", "description": "GPS latitude." },
+        "longitude": { "type": "number", "description": "GPS longitude." },
+        "accuracy": { "type": "number", "description": "GPS accuracy in meters." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the location was last updated." }
+      },
+      "required": ["latitude", "longitude", "updatedAt"]
+    },
+    "Status": {
+      "title": "Status",
+      "description": "Current safety status of a user.",
+      "type": "object",
+      "properties": {
+        "currentStatus": { "type": "string", "enum": ["Safe", "Reached Home", "On the Way", "Need Help"], "description": "Current safety status." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the status was last updated." }
+      },
+      "required": ["currentStatus", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": { "$ref": "#/entities/User" }, "description": "User profiles." },
+    "/families/{familyId}": { "schema": { "$ref": "#/entities/Family" }, "description": "Family groups." },
+    "/families/{familyId}/members/{userId}": { "schema": { "$ref": "#/entities/Member" }, "description": "Family membership details." },
+    "/locations/{userId}": { "schema": { "$ref": "#/entities/Location" }, "description": "Real-time user locations." },
+    "/status/{userId}": { "schema": { "$ref": "#/entities/Status" }, "description": "User safety statuses." }
+  }
+}
